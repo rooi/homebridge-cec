@@ -18,6 +18,6 @@
   },
 
   "dependencies": {
-    "cec": "https://github.com/rooi/node-cec.git#transmit"
+    //"cec": "https://github.com/rooi/node-cec.git#transmit"
   }
 }
