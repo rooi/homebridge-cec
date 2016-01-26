@@ -50,10 +50,10 @@ module.exports = function(homebridge) {
             } else {
                 console.log('open and write command ' + command);
                  
-                adapter.transmit({
-                                  initiator: CEC.LogicalAddress.TUNER1,
-                                  destination: CEC.LogicalAddress.TV
-                                  });
+                //adapter.transmit({
+                //                  initiator: CEC.LogicalAddress.TUNER1,
+                //                  destination: CEC.LogicalAddress.TV
+                //                  });
                 adapter.on('logmessage', function(data) {
                             that.log(data.message);
                             });

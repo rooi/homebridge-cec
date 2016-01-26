@@ -17,7 +17,7 @@ Configuration sample:
 "accessories": [
     {
         "accessory": "CEC",
-        "name": "Television",
+        "name": "Television"
     }
 ]
 ```
