@@ -23,6 +23,21 @@ module.exports = function(homebridge) {
         this.log = log;
         
         this.adapters = cec.detectAdapters();
+        this.log('CEC adapters: %j', this.adapters);
+        
+        this.adapter = 0;
+        
+        var o = cec.open(this.adapters[0].portName, function (error, adapter) {
+            var that = this;
+            if ( error ) {
+                 this.log('failed to open: '+error);
+            } else {
+                this.adapter = adapter;
+                 adapter.on('logmessage', function(data) {
+                            this.log(data.message);
+                 }.bind(this));
+            }
+        }.bind(this));
     }
     
     LibCEC.prototype = {
@@ -42,7 +57,14 @@ module.exports = function(homebridge) {
         
     sendCommand: function(command, callback) {
         var that = this;
-        
+        if(this.adapter) {
+            if(command == 'on') this.adapter.powerOn();
+            else if(command == 'off') this.adapter.standby();
+            callback(0,0);
+        } else {
+            callback(1,1);
+        }
+        /*
         //if(that.serialPort.isOpen()) that.serialPort.close();
         cec.open(that.adapters[0].portName, function (error, adapter) {
             if ( error ) {
@@ -68,6 +90,7 @@ module.exports = function(homebridge) {
                  }
             }
         });
+         */
     },
         
     process: function() {
@@ -113,11 +136,11 @@ module.exports = function(homebridge) {
         
         this.exec(cmd, function(response,error) {
                          if (error) {
-                         this.log('Serial power function failed: %s');
+                         this.log('CEC power function failed: %s');
                          callback(error);
                          }
                          else {
-                         this.log('Serial power function succeeded!');
+                         this.log('CEC power function succeeded!');
                          callback();
                          }
                          }.bind(this));
