@@ -58,39 +58,14 @@ module.exports = function(homebridge) {
     sendCommand: function(command, callback) {
         var that = this;
         if(this.adapter) {
+            var response = 0;
             if(command == 'on') this.adapter.powerOn();
             else if(command == 'off') this.adapter.standby();
-            callback(0,0);
+            else if(command == 'isOn') response = this.adapter.getPowerState();
+            callback(response,0);
         } else {
             callback(1,1);
         }
-        /*
-        //if(that.serialPort.isOpen()) that.serialPort.close();
-        cec.open(that.adapters[0].portName, function (error, adapter) {
-            if ( error ) {
-                that.log('failed to open: '+error);
-            } else {
-                console.log('open and write command ' + command);
-                 
-                //adapter.transmit({
-                //                  initiator: CEC.LogicalAddress.TUNER1,
-                //                  destination: CEC.LogicalAddress.TV
-                //                  });
-                adapter.on('logmessage', function(data) {
-                            that.log(data.message);
-                            });
-                 
-                 if(command == 'on') {
-                    adapter.powerOn();
-                    callback(0,0);
-                 }
-                 else if(command == 'off') {
-                    adapter.standby();
-                    callback(0,0);
-                 }
-            }
-        });
-         */
     },
         
     process: function() {
@@ -104,24 +79,28 @@ module.exports = function(homebridge) {
                     self.process();
                     }, this.timeout);
     },
-/* TODO
+
     getPowerState: function(callback) {
-        var cmd = "@PWR:?\r";
+        var cmd = 'isOn';
         
         this.exec(cmd, function(response,error) {
-                         
-                         if (response && response.indexOf("@PWR:2") > -1) {
-                         callback(null, true);
-                         }
-                         else {
-                         callback(null, false);
-                         }
-                         this.log("Power state is:", response);
-                         
-                         }.bind(this))
+                  if (error) {
+                    this.log('CEC power function failed: %s');
+                    callback(error);
+                  }
+                  else {
+                    if (response) {
+                        callback(null, true);
+                    }
+                    else {
+                        callback(null, false);
+                    }
+                    this.log("Power state is:", response);
+                  }
+              }.bind(this))
         
     },
-*/
+
     setPowerState: function(powerOn, callback) {
         var cmd;
         
@@ -159,7 +138,7 @@ module.exports = function(homebridge) {
         var switchService = new Service.Switch("Power State");
         switchService
         .getCharacteristic(Characteristic.On)
-//        .on('get', this.getPowerState.bind(this))
+        .on('get', this.getPowerState.bind(this))
         .on('set', this.setPowerState.bind(this));
 
         return [informationService, switchService];
