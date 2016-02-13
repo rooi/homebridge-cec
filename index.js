@@ -36,7 +36,18 @@ module.exports = function(homebridge) {
             } else {
                 this.adapter = adapter;
                  adapter.on('logmessage', function(data) {
-                            this.log(data.message);
+                    this.log.debug(data.message);
+                 }.bind(this));
+                 adapter.on('command', function(data) {
+                    this.log("command: initiator=" + data.initiator + " destination=" + data.destination + " opcode=" + data.opcode);
+                            
+                    if (this.switchService) {
+                        var charOn = this.switchService.getCharacteristic(Characteristic.On);
+                        if(charOn) {
+                            if(data.opcode == 54) charOn.setValue(0);     // CEC_OPCODE_STANDBY
+                            else if(data.opcode == 9) charOn.setValue(1); // CEC_OPCODE_RECORD_ON
+                        }
+                    }
                  }.bind(this));
             }
         }.bind(this));
@@ -166,20 +177,20 @@ module.exports = function(homebridge) {
         .setCharacteristic(Characteristic.Model, "Z3030")
         .setCharacteristic(Characteristic.SerialNumber, "1244567890");
         
-        var switchService = new Service.Switch("Power State");
-        switchService
+        this.switchService = new Service.Switch("Power State");
+        this.switchService
         .getCharacteristic(Characteristic.On)
         .on('get', this.getPowerState.bind(this))
         .on('set', this.setPowerState.bind(this));
         
         makeHDMICharacteristic();
         
-        switchService
+        this.switchService
         .addCharacteristic(HDMICharacteristic)
         .on('get', this.getHDMIPort.bind(this))
         .on('set', this.setHDMIPort.bind(this));
         
-        return [informationService, switchService];
+        return [informationService, this.switchService];
     }
     }
 };
