@@ -127,7 +127,7 @@ module.exports = function(homebridge) {
                          }
                          else {
                          this.log('CEC power function succeeded!');
-                         callback();
+                         if(callback) callback();
                          }
                          }.bind(this));
     },
@@ -139,6 +139,8 @@ module.exports = function(homebridge) {
         
     setHDMIPort: function(port, callback) {
         var cmd = 'hdmi' + port;
+        
+        this.setPowerState('on');
         
         this.log("Set", this.name, "hdmi port to " + port);
         
