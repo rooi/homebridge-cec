@@ -20,6 +20,8 @@ module.exports = function(homebridge) {
         this.queue = [];
         this.ready = true;
         
+        this.hdmiPort = 1;
+        
         this.log = log;
         
         this.adapters = cec.detectAdapters();
@@ -62,6 +64,11 @@ module.exports = function(homebridge) {
             if(command == 'on') this.adapter.powerOn();
             else if(command == 'off') this.adapter.standby();
             else if(command == 'isOn') response = this.adapter.getPowerState();
+            else if(command.indexOf('hdmi')>-1) {
+                var port = parseInt(command.substr(command.indexOf('hdmi')+4));
+                this.hdmiPort = port;
+                response = this.adapter.setHDMIPort(port);
+            }
             callback(response,0);
         } else {
             callback(1,1);
@@ -124,6 +131,28 @@ module.exports = function(homebridge) {
                          }
                          }.bind(this));
     },
+        
+    getHDMIPort: function(callback) {
+        // Not implemented yet
+        callback(null,this.hdmiPort);
+    },
+        
+    setHDMIPort: function(port, callback) {
+        var cmd = 'hdmi' + port;
+        
+        this.log("Set", this.name, "hdmi port to " + port);
+        
+        this.exec(cmd, function(response,error) {
+            if (error) {
+                this.log('CEC setHDMI function failed: %s');
+                callback(error);
+            }
+            else {
+                this.log('CEC setHDMI function succeeded!');
+                callback();
+            }
+        }.bind(this));
+    },
 
     getServices: function() {
         var that = this;
@@ -140,8 +169,33 @@ module.exports = function(homebridge) {
         .getCharacteristic(Characteristic.On)
         .on('get', this.getPowerState.bind(this))
         .on('set', this.setPowerState.bind(this));
-
+        
+        makeHDMICharacteristic();
+        
+        switchService
+        .addCharacteristic(HDMICharacteristic)
+        .on('get', this.getHDMIPort.bind(this))
+        .on('set', this.setHDMIPort.bind(this));
+        
         return [informationService, switchService];
     }
     }
+};
+
+function makeHDMICharacteristic() {
+    
+    HDMICharacteristic = function () {
+        Characteristic.call(this, 'HDMI', '212131F4-2E14-4FF4-AE13-C97C3232499D');
+        this.setProps({
+                      format: Characteristic.Formats.INT,
+                      unit: Characteristic.Units.NONE,
+                      maxValue: 4,
+                      minValue: 1,
+                      minStep: 1,
+                      perms: [Characteristic.Perms.READ, Characteristic.Perms.WRITE, Characteristic.Perms.NOTIFY]
+                      });
+        this.value = this.getDefaultValue();
+    };
+    
+    inherits(HDMICharacteristic, Characteristic);
 }
