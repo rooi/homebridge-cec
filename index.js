@@ -39,13 +39,22 @@ module.exports = function(homebridge) {
                     this.log.debug(data.message);
                  }.bind(this));
                  adapter.on('command', function(data) {
-                    this.log("command: initiator=" + data.initiator + " destination=" + data.destination + " opcode=" + data.opcode);
+                    this.log.debug("command: initiator=" + data.initiator + " destination=" + data.destination + " opcode=" + data.opcode);
+                        //this.log("\tparameters =" + data.parameter000 + "\n" + data.parameter001 + "\n" + data.parameter002 + "\n" + data.parameter003 + "\n" + data.parameter004 + "\n");
                             
                     if (this.switchService) {
                         var charOn = this.switchService.getCharacteristic(Characteristic.On);
                         if(charOn) {
                             if(data.opcode == 54) charOn.setValue(0);     // CEC_OPCODE_STANDBY
                             else if(data.opcode == 9) charOn.setValue(1); // CEC_OPCODE_RECORD_ON
+                        }
+                        var charHDMI = this.switchService.getCharacteristic(HDMICharacteristic);
+                        if(charHDMI) {
+                            if(data.opcode == 128) { // CEC_OPCODE_ROUTING_CHANGE
+                                var port = data.parameter002/16; // HDMI 1=16;2=23;3=48
+                                this.log.debug("HDMI has changed to: " + port)
+                                charHDMI.setValue(port);
+                            }
                         }
                     }
                  }.bind(this));
@@ -202,7 +211,7 @@ function makeHDMICharacteristic() {
         this.setProps({
                       format: Characteristic.Formats.INT,
                       unit: Characteristic.Units.NONE,
-                      maxValue: 4,
+                      maxValue: 3,
                       minValue: 1,
                       minStep: 1,
                       perms: [Characteristic.Perms.READ, Characteristic.Perms.WRITE, Characteristic.Perms.NOTIFY]
