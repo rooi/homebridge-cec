@@ -1,11 +1,14 @@
 {
   "name": "homebridge-cec",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "libcec for homebridge: https://github.com/nfarina/homebridge",
   "license": "ISC",
   "keywords": [
     "homebridge-plugin"
   ],
+  "scripts": {
+    "install": "node_modules/cec && node-gyp rebuild"
+  },
 
   "repository": {
     "type": "git",
@@ -18,5 +21,6 @@
   },
 
   "dependencies": {
+      "node-cec": "https://github.com/rooi/node-cec.git#transmit"
   }
 }
