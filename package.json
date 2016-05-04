@@ -7,7 +7,7 @@
     "homebridge-plugin"
   ],
   "scripts": {
-    "install": "node_modules/cec && node-gyp rebuild"
+    "install": "cd node_modules/cec && node-gyp rebuild"
   },
 
   "repository": {
