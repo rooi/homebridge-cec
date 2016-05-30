@@ -1,8 +1,10 @@
 // Accessory for controlling Marantz AVR via HomeKit
 
 var inherits = require('util').inherits;
-var CEC = require("cec");
-var cec = new CEC();
+var nodecec = require("node-cec");
+var NodeCec = nodecec.NodeCec;
+//var cec = new NodeCec( 'node-cec-monitor' );
+var CEC     = nodecec.CEC;
 var Service, Characteristic;
 
 module.exports = function(homebridge) {
@@ -10,7 +12,6 @@ module.exports = function(homebridge) {
     Characteristic = homebridge.hap.Characteristic;
     
     homebridge.registerAccessory("homebridge-cec", "CEC", LibCEC);
-    
     
     function LibCEC(log, config) {
         // configuration
@@ -24,167 +25,58 @@ module.exports = function(homebridge) {
         
         this.log = log;
         
-        this.adapters = cec.detectAdapters();
-        this.log('CEC adapters: %j', this.adapters);
-        
-        this.adapter = 0;
-        
-        var o = cec.open(this.adapters[0].portName, function (error, adapter) {
-            var that = this;
-            if ( error ) {
-                 this.log('failed to open: '+error);
-            } else {
-                this.adapter = adapter;
-                 adapter.on('logmessage', function(data) {
-                    this.log.debug(data.message);
-                 }.bind(this));
-                 adapter.on('command', function(data) {
-                    this.log.debug("command: initiator=" + data.initiator + " destination=" + data.destination + " opcode=" + data.opcode);
-                        //this.log("\tparameters =" + data.parameter000 + "\n" + data.parameter001 + "\n" + data.parameter002 + "\n" + data.parameter003 + "\n" + data.parameter004 + "\n");
-                            
-                    if (this.switchService) {
-                        var charOn = this.switchService.getCharacteristic(Characteristic.On);
-                        if(charOn) {
-                            if(data.opcode == 54) charOn.setValue(0);     // CEC_OPCODE_STANDBY
-                            else if(data.opcode == 9) charOn.setValue(1); // CEC_OPCODE_RECORD_ON
-                        }
-                        var charHDMI = this.switchService.getCharacteristic(HDMICharacteristic);
-                        if(charHDMI) {
-                            if(data.opcode == 128) { // CEC_OPCODE_ROUTING_CHANGE
-                                var port = data.parameter002/16; // HDMI 1=16;2=23;3=48
-                                this.log.debug("HDMI has changed to: " + port)
-                                charHDMI.setValue(port);
-                            }
-                        }
-                    }
-                 }.bind(this));
-            }
-        }.bind(this));
+        this.isOn = true; // TV is turned on at start
     }
     
     LibCEC.prototype = {
         
-    send: function(cmd, callback) {
-        this.sendCommand(cmd, callback);
-        //if (callback) callback();
-    },
-        
-    exec: function() {
-        // Check if the queue has a reasonable size
-        if(this.queue.length > 5) this.queue.clear();
-            
-        this.queue.push(arguments);
-        this.process();
-    },
-        
-    sendCommand: function(command, callback) {
-        var that = this;
-        if(this.adapter) {
-            var response = 0;
-            if(command == 'on') this.adapter.powerOn();
-            else if(command == 'off') this.adapter.standby();
-            else if(command == 'isOn') response = this.adapter.getPowerState();
-            else if(command.indexOf('hdmi')>-1) {
-                var port = parseInt(command.substr(command.indexOf('hdmi')+4));
-                this.hdmiPort = port;
-                response = this.adapter.setHDMIPort(port);
-            }
-            callback(response,0);
-        } else {
-            callback(1,1);
-        }
-    },
-        
-    process: function() {
-        if (this.queue.length === 0) return;
-        if (!this.ready) return;
-        var self = this;
-        this.ready = false;
-        this.send.apply(this, this.queue.shift());
-        setTimeout(function () {
-                    self.ready = true;
-                    self.process();
-                    }, this.timeout);
-    },
-
     getPowerState: function(callback) {
-        var cmd = 'isOn';
-        
-        this.exec(cmd, function(response,error) {
-                  if (error) {
-                    this.log('CEC power function failed: %s');
-                    callback(error);
-                  }
-                  else {
-                    if (response) {
-                        callback(null, true);
-                    }
-                    else {
-                        callback(null, false);
-                    }
-                    this.log("Power state is:", response);
-                  }
-              }.bind(this))
-        
+        this.log("Power state is: ", this.isOn);
+        if(callback) callback(null, this.isOn);
     },
-
-    setPowerState: function(powerOn, callback) {
-        var cmd;
         
-        if (powerOn) {
-            cmd = 'on';
-            this.log("Set", this.name, "to on");
+    setPowerState: function(powerOn, callback) {
+        this.isOn = powerOn;
+        if(this.client) {
+            if(this.isOn) {
+                this.client.sendCommand( 0xf0, CEC.Opcode.IMAGE_VIEW_ON  );
+            }
+            else {
+                this.client.sendCommand( 0xf0, CEC.Opcode.STANDBY );
+            }
+            if(callback) callback();
         }
         else {
-            cmd = 'off';
-            this.log("Set", this.name, "to off");
+            if(callback) callback("no client");
         }
-        
-        this.exec(cmd, function(response,error) {
-                         if (error) {
-                         this.log('CEC power function failed: %s');
-                         callback(error);
-                         }
-                         else {
-                         this.log('CEC power function succeeded!');
-                         if(callback) callback();
-                         }
-                         }.bind(this));
     },
-        
+
     getHDMIPort: function(callback) {
         // Not implemented yet
         callback(null,this.hdmiPort);
     },
         
     setHDMIPort: function(port, callback) {
-        var cmd = 'hdmi' + port;
+        this.hdmiPort = port;
         
-        this.setPowerState('on');
-        
-        this.log("Set", this.name, "hdmi port to " + port);
-        
-        this.exec(cmd, function(response,error) {
-            if (error) {
-                this.log('CEC setHDMI function failed: %s');
-                callback(error);
-            }
-            else {
-                this.log('CEC setHDMI function succeeded!');
-                callback();
-            }
-        }.bind(this));
-    },
+        if(this.client) this.client.sendCommand( 0x1f, CEC.Opcode.ACTIVE_SOURCE, port*16, 0x00);
 
+        if(callback) callback();
+    },
+        
     getServices: function() {
         var that = this;
+        
+        this.cec = new NodeCec( 'node-cec-monitor' );
         
         var informationService = new Service.AccessoryInformation();
         informationService
         .setCharacteristic(Characteristic.Name, this.name)
         .setCharacteristic(Characteristic.Manufacturer, "Toshiba")
-        .setCharacteristic(Characteristic.Model, "Z3030")
+        .setCharacteristic(Characteristic.Model, "homebridge")
         .setCharacteristic(Characteristic.SerialNumber, "1244567890");
+        
+        this.informationService = informationService; // Store to allow changing at runtime
         
         this.switchService = new Service.Switch("Power State");
         this.switchService
@@ -199,9 +91,54 @@ module.exports = function(homebridge) {
         .on('get', this.getHDMIPort.bind(this))
         .on('set', this.setHDMIPort.bind(this));
         
+        // Get Vendor ID
+        this.cec.once( 'ready', function(client) {
+            this.log( ' -- GIVE_DEVICE_VENDOR_ID -- ' );
+            this.client = client; // Store the client for later usage
+            client.sendCommand( 0xf0, CEC.Opcode.GIVE_DEVICE_VENDOR_ID, 0x0F, 0x8C );
+            client.sendCommand( 0xf0, CEC.Opcode.IMAGE_VIEW_ON ); // This works (on)
+            this.cec.once( 'DEVICE_VENDOR_ID', function (packet, id, vendor) {
+                this.log('DEVICE_VENDOR_ID:' + packet + ", " + id + ", " + vendor);
+                this.informationService.getCharacteristic(Characteristic.Manufacturer).setValue(vendor);
+            }.bind(this));
+        }.bind(this));
+        
+        this.cec.on( 'ROUTING_CHANGE', function(packet, fromSource, toSource) {
+            this.log( 'Routing changed from ' + fromSource + ' to ' + toSource + '.' );
+            if(toSource == 0) {
+               this.isOn = false;
+               this.hdmiPort = 0;
+               this.switchService.getCharacteristic(Characteristic.On).setValue(this.isOn);
+               this.switchService.getCharacteristic(HDMICharacteristic).setValue(this.hdmiPort);
+            }
+            else if( fromSource == 0 ){
+               this.isOn = true;
+               this.hdmiPort = toSource/4096;
+               this.switchService.getCharacteristic(Characteristic.On).setValue(this.isOn);
+               this.switchService.getCharacteristic(HDMICharacteristic).setValue(this.hdmiPort);
+            }
+        }.bind(this));
+        
+        this.cec.on( 'STANDBY', function() {
+            this.log( 'STANDBY' );
+            this.isOn = false;
+            this.switchService.getCharacteristic(Characteristic.On).setValue(this.isOn);
+        }.bind(this));
+        
+        
+        // -------------------------------------------------------------------------- //
+        //- START CEC CLIENT
+        
+        // -m  = start in monitor-mode
+        // -d8 = set log level to 8 (=TRAFFIC) (-d 8)
+        // -br = logical address set to `recording device`
+        this.log("Starting cec-client");
+        this.cec.start( 'cec-client', '-m', '-d', '8', '-b', 'r' );
+
+        
         return [informationService, this.switchService];
     }
-    }
+    };
 };
 
 function makeHDMICharacteristic() {
@@ -209,13 +146,13 @@ function makeHDMICharacteristic() {
     HDMICharacteristic = function () {
         Characteristic.call(this, 'HDMI', '212131F4-2E14-4FF4-AE13-C97C3232499D');
         this.setProps({
-                      format: Characteristic.Formats.INT,
-                      unit: Characteristic.Units.NONE,
-                      maxValue: 3,
-                      minValue: 1,
-                      minStep: 1,
-                      perms: [Characteristic.Perms.READ, Characteristic.Perms.WRITE, Characteristic.Perms.NOTIFY]
-                      });
+            format: Characteristic.Formats.INT,
+            unit: Characteristic.Units.NONE,
+            maxValue: 3,
+            minValue: 1,
+            minStep: 1,
+            perms: [Characteristic.Perms.READ, Characteristic.Perms.WRITE, Characteristic.Perms.NOTIFY]
+        });
         this.value = this.getDefaultValue();
     };
     

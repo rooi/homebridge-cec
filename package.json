@@ -16,7 +16,10 @@
     "node": ">=0.12.0",
     "homebridge": ">=0.2.0"
   },
-
+    
   "dependencies": {
+      "node-cec": "git://github.com/rooi/node-cec.git",
+      "coffee-script": "1.10.0",
+      "coffeelint": "1.15.7"
   }
 }
