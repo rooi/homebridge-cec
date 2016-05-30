@@ -125,6 +125,17 @@ module.exports = function(homebridge) {
             this.switchService.getCharacteristic(Characteristic.On).setValue(this.isOn);
         }.bind(this));
         
+        // -------------------------------------------------------------------------- //
+        //- KILL CEC-CLIENT PROCESS ON EXIT
+        
+        process.on( 'SIGINT', function() {
+            console.log("Killing CEC");
+            if ( this.cec != null ) {
+                this.cec.stop();
+            }
+            process.exit();
+        });
+        
         
         // -------------------------------------------------------------------------- //
         //- START CEC CLIENT
