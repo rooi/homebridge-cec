@@ -30,25 +30,74 @@ module.exports = function(homebridge) {
     
     LibCEC.prototype = {
         
+    send: function(cmd, callback) {
+        this.sendCommand(cmd, callback);
+        //if (callback) callback();
+    },
+        
+    exec: function() {
+        // Check if the queue has a reasonable size
+        if(this.queue.length > 5) this.queue.clear();
+        
+        this.queue.push(arguments);
+        this.process();
+    },
+        
+    sendCommand: function(command, callback) {
+        var that = this;
+        
+        if(that.client) {
+            if(command == "power") {
+                if(that.isOn) {
+                    that.client.sendCommand( 0xf0, CEC.Opcode.IMAGE_VIEW_ON  );
+                }
+                else {
+                    that.client.sendCommand( 0xf0, CEC.Opcode.STANDBY );
+                }
+                if(callback) callback();
+            }
+            else if (command == "hdmi") {
+                that.client.sendCommand( 0x1f, CEC.Opcode.ACTIVE_SOURCE, this.hdmiPort*16, 0x00);
+                if(callback) callback();
+            }
+        }
+        else {
+            if(callback) callback("no client");
+        }
+        
+    },
+        
+    process: function() {
+        if (this.queue.length === 0) return;
+        if (!this.ready) return;
+        var self = this;
+        this.ready = false;
+        this.send.apply(this, this.queue.shift());
+        setTimeout(function () {
+                   self.ready = true;
+                   self.process();
+                   }, this.timeout);
+    },
+        
     getPowerState: function(callback) {
         this.log("Power state is: ", this.isOn);
         if(callback) callback(null, this.isOn);
     },
         
     setPowerState: function(powerOn, callback) {
+        var cmd = "power";
         this.isOn = powerOn;
-        if(this.client) {
-            if(this.isOn) {
-                this.client.sendCommand( 0xf0, CEC.Opcode.IMAGE_VIEW_ON  );
+        
+        this.exec(cmd, function(error) {
+            if (error) {
+                this.log('setPowerState: %s');
+                if(callback) callback(error);
             }
             else {
-                this.client.sendCommand( 0xf0, CEC.Opcode.STANDBY );
+                this.log('setPowerState succeeded!');
+                if(callback) callback();
             }
-            if(callback) callback();
-        }
-        else {
-            if(callback) callback("no client");
-        }
+        }.bind(this));
     },
 
     getHDMIPort: function(callback) {
@@ -57,11 +106,32 @@ module.exports = function(homebridge) {
     },
         
     setHDMIPort: function(port, callback) {
-        this.hdmiPort = port;
+        if(!this.isOn) { // Turn on if it was off
+            var cmd = "power";
+            this.isOn = true;
+            this.exec(cmd, function(response,error) {
+                if (error) {
+                    this.log('setPowerState: %s');
+                }
+                else {
+                    this.switchService.getCharacteristic(Characteristic.On).setValue(this.isOn);
+                    this.log('setPowerState succeeded!');
+                }
+            }.bind(this));
+        }
         
-        if(this.client) this.client.sendCommand( 0x1f, CEC.Opcode.ACTIVE_SOURCE, port*16, 0x00);
-
-        if(callback) callback();
+        var cmd = "hdmi";
+        this.hdmiPort = port;
+        this.exec(cmd, function(error) {
+            if (error) {
+                this.log('setHDMIPort failed: %s');
+                if(callback) callback(error);
+            }
+            else {
+                this.log('setHDMIPort succeeded!');
+                if(callback) callback();
+            }
+        }.bind(this));
     },
         
     getServices: function() {
@@ -115,6 +185,11 @@ module.exports = function(homebridge) {
                this.isOn = true;
                this.hdmiPort = toSource/4096;
                this.switchService.getCharacteristic(Characteristic.On).setValue(this.isOn);
+               this.switchService.getCharacteristic(HDMICharacteristic).setValue(this.hdmiPort);
+            }
+            else{
+               this.hdmiPort = toSource/4096;
+               this.log("Switched to: " + this.hdmiPort + " port");
                this.switchService.getCharacteristic(HDMICharacteristic).setValue(this.hdmiPort);
             }
         }.bind(this));
