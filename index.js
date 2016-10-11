@@ -88,9 +88,10 @@ module.exports = function(homebridge) {
         var cmd = "power";
         this.isOn = powerOn;
         
+        this.log('setPowerState call: ' + powerOn);
         this.exec(cmd, function(error) {
             if (error) {
-                this.log('setPowerState: %s');
+                this.log('setPowerState: ' + error);
                 if(callback) callback(error);
             }
             else {
@@ -111,7 +112,7 @@ module.exports = function(homebridge) {
             this.isOn = true;
             this.exec(cmd, function(response,error) {
                 if (error) {
-                    this.log('setPowerState: %s');
+                    this.log('setHDMIPort: ' + error);
                 }
                 else {
                     this.switchService.getCharacteristic(Characteristic.On).setValue(this.isOn);
@@ -124,7 +125,7 @@ module.exports = function(homebridge) {
         this.hdmiPort = port;
         this.exec(cmd, function(error) {
             if (error) {
-                this.log('setHDMIPort failed: %s');
+                this.log('setHDMIPort failed: ' + error);
                 if(callback) callback(error);
             }
             else {
@@ -196,8 +197,8 @@ module.exports = function(homebridge) {
         
         this.cec.on( 'STANDBY', function() {
             this.log( 'STANDBY' );
+            if(this.isOn) this.switchService.getCharacteristic(Characteristic.On).setValue(this.isOn);
             this.isOn = false;
-            this.switchService.getCharacteristic(Characteristic.On).setValue(this.isOn);
         }.bind(this));
         
         // -------------------------------------------------------------------------- //
