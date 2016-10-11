@@ -197,7 +197,7 @@ module.exports = function(homebridge) {
         
         this.cec.on( 'STANDBY', function() {
             this.log( 'STANDBY' );
-            if(this.isOn) this.switchService.getCharacteristic(Characteristic.On).setValue(this.isOn);
+            if(this.isOn) this.switchService.getCharacteristic(Characteristic.On).setValue(false);
             this.isOn = false;
         }.bind(this));
         
