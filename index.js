@@ -212,6 +212,16 @@ module.exports = function(homebridge) {
             process.exit();
         });
         
+        // -------------------------------------------------------------------------- //
+        //- KILL CEC-CLIENT PROCESS ON SEGFAULT
+        
+        process.on( 'SIGSEGV', function() {
+            console.log("Killing CEC");
+            if ( this.cec != null ) {
+                this.cec.stop();
+            }
+            process.exit();
+        });
         
         // -------------------------------------------------------------------------- //
         //- START CEC CLIENT
